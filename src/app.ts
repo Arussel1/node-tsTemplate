@@ -3,10 +3,16 @@ import createError from 'http-errors';
 import path from 'path';
 import cookieParser from 'cookie-parser';
 import logger from 'morgan';
+import expressSession from 'express-session';
+import passport from 'passport';
+import { PrismaSessionStore } from '@quixo3/prisma-session-store';
+import  { PrismaClient } from '@prisma/client';
 
 
+import './config/passport'
 import indexRouter from './routes/index';
 import usersRouter from './routes/users';
+import authRouter from './routes/auth';
 
 const app = express();
 
@@ -19,8 +25,28 @@ app.use(express.urlencoded({ extended: false }));
 app.use(cookieParser());
 app.use(express.static(path.join(__dirname, './../public')));
 
+app.use(
+  expressSession({
+    cookie: {
+     maxAge: 7 * 24 * 60 * 60 * 1000 // ms
+    },
+    secret: 'a santa at nasa',
+    resave: true,
+    saveUninitialized: true,
+    store: new PrismaSessionStore(
+      new PrismaClient(),
+      {
+        checkPeriod: 2 * 60 * 1000,  //ms
+        dbRecordIdIsSessionId: true,
+        dbRecordIdFunction: undefined,
+      }
+    )
+  })
+);
+
 app.use('/', indexRouter);
-app.use('/users', usersRouter);
+app.use('/auth', authRouter);
+app.use('/users', passport.authenticate('jwt', {session: false}), /* user */);
 
 // catch 404 and forward to error handler
 app.use(function(req, res, next) {
